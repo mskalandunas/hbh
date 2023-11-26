@@ -1,7 +1,10 @@
 import { JSDOM } from 'jsdom';
 import { config } from 'dotenv';
+import sqlite from 'sqlite3';
 
-const { BASE_URL, FILTER_FOR } = config().parsed;
+const sqlite3 = sqlite.verbose(); 
+
+const { BASE_URL, DB_NAME, FILTER_FOR } = config().parsed;
 
 const requestedEndpoints = new Set([]);
 
@@ -36,7 +39,12 @@ const pipeline = url => new Promise((resolve, reject) => {
       requestedEndpoints.add(url);
 
       return text;
-    })
+    }, reject)
+    .then(text => {
+      db.run('INSERT INTO pages (id, title, html_content) VALUES (?, ?, ?)', [1, url, text]);
+    
+      return text;
+    }, reject)
     .then(convertTextToDOM, reject)
     .then(getHrefList, reject)
     .then(withDelay(runOnList, getRandomNumber()), reject)
@@ -52,5 +60,9 @@ setInterval(() => {
       .join(',\n')
   }`);
 }, 10000);
+
+const db = new sqlite3.Database(`./db.${DB_NAME}`);
+
+db.run('CREATE TABLE IF NOT EXISTS pages (id INT, title TEXT, html_content BLOB)');
 
 pipeline(BASE_URL).then(console.log, console.error).catch(console.error);
